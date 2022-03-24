@@ -16,7 +16,7 @@ typedef struct {
 int add_node(node *in, node into[], int length); 
 int remove_node(char *nodename, node into[], int length);
 void print_nodes(node into[], int length);
-node *get_node(const char *nodename, node into[], int length); 
+node* get_node(char *nodename, node into[], int length); 
 
 // So that a File or a Tag can be associated with another one more then one
 // n:m

@@ -15,7 +15,7 @@ int remove_node(char *nodename, node into[], int length) {
   int p;
   for (p=0;p<length;p++) {
     if (into[p].nodename != NULL) {
-      if (into[p].nodename == nodename) {
+      if (strcmp(into[p].nodename, nodename) == 0) {
         into[p] = (node){};
         return 0;
       }
@@ -28,7 +28,7 @@ int search_node(char *nodename, node into[], int length) {
   int p;
   for (p=0;p<length;p++) {
     if (into[p].nodename != NULL) {
-      if (into[p].nodename == nodename) {
+      if (strcmp(into[p].nodename, nodename) == 0) {
         return 0;
       }
     }
@@ -36,16 +36,16 @@ int search_node(char *nodename, node into[], int length) {
   return 1;
 }
 
-node *get_node(const char *nodename, node into[], int length) {
+node *get_node(char *nodename, node into[], int length) {
   int p;
   for (p=0;p<length;p++) {
     if (into[p].nodename != NULL) {
-      if (into[p].nodename == nodename) {
+      if (strcmp(into[p].nodename, nodename) == 0) {
         return &into[p];
       }
     }
   }
-  return 0;
+  return &(node){0};
 }
 
 void print_nodes(node into[], int length) {
@@ -83,7 +83,7 @@ int get_assocs(
   int return_value = 0;
   for (p=0;p<na_length;p++) {
     if (na[p].nodename1 != NULL) {
-      if (na[p].nodename1 == ret->nodename) {
+      if (strcmp(na[p].nodename1, ret->nodename) == 0) {
         node* temp = get_node(na[p].nodename2, nodes, nodes_length);
         if (temp != 0) {
           add_node(temp, buffer, buffer_length);
@@ -91,7 +91,7 @@ int get_assocs(
         }
       }
     } else if (na[p].nodename2 != NULL) {
-      if (na[p].nodename2 == ret->nodename) {
+      if (strcmp(na[p].nodename2, ret->nodename) == 0) {
         node* temp = get_node(na[p].nodename1, nodes, nodes_length);
         if (temp != 0) {
           add_node(temp, buffer, buffer_length);
