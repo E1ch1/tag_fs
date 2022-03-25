@@ -1,4 +1,5 @@
 #include "nodes.h"
+#include <string.h>
 int add_node(node *in, node into[], int length) {
 
   int p;
@@ -47,6 +48,17 @@ node *get_node(char *nodename, node into[], int length) {
   }
   return &(node){0};
 }
+int get_node_fh(char *nodename, node into[], int length){
+  int p;
+  for (p=0;p<length;p++) {
+    if (into[p].nodename != NULL) {
+      if (strcmp(into[p].nodename, nodename) == 0) {
+        return p;
+      }
+    }
+  }
+  return NULL;
+}
 
 void print_nodes(node into[], int length) {
   int p;
@@ -83,16 +95,16 @@ int get_assocs(
   int return_value = 0;
   for (p=0;p<na_length;p++) {
     if (na[p].nodename1 != NULL) {
-      if (strcmp(na[p].nodename1, ret->nodename) == 0) {
-        node* temp = get_node(na[p].nodename2, nodes, nodes_length);
+      if (strcmp(na[p].nodename2, ret->nodename) == 0) {
+        node* temp = get_node(na[p].nodename1, nodes, nodes_length);
         if (temp != 0) {
           add_node(temp, buffer, buffer_length);
           return_value++;
         }
       }
     } else if (na[p].nodename2 != NULL) {
-      if (strcmp(na[p].nodename2, ret->nodename) == 0) {
-        node* temp = get_node(na[p].nodename1, nodes, nodes_length);
+      if (strcmp(na[p].nodename1, ret->nodename) == 0) {
+        node* temp = get_node(na[p].nodename2, nodes, nodes_length);
         if (temp != 0) {
           add_node(temp, buffer, buffer_length);
           return_value++;

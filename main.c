@@ -45,6 +45,7 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
     (void) fi;
     int res = 0;
 
+    printf( "Path from empty_getattr: %s\n", path );
 	
 	memset(stbuf, 0, sizeof(struct stat));
 	if (strcmp(path, "/") == 0) {
@@ -52,15 +53,22 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
 		stbuf->st_nlink = 2;
 		return res;
 	}
-    path++;
+
+    char * path_new = strrchr(path, '/');
+    path = path_new ? path_new + 1 : path;
 
     node ter = *get_node(path, nodes, MAX_FILE_AMOUNT);
     if (ter.nodename == NULL) {
         res = -ENOENT;
     } else {
-        stbuf->st_mode = S_IFREG | 0444;
-        stbuf->st_nlink = 1;
-        stbuf->st_size = 0;
+        if (ter.node_type == NODE_TYPE_FILE){
+            stbuf->st_mode = S_IFREG | 0444;
+            stbuf->st_nlink = 1;
+            stbuf->st_size = 0;
+        } else {
+            stbuf->st_mode = S_IFDIR | 0755;
+		    stbuf->st_nlink = 2;
+        }
     }
 	return res;
 }
@@ -69,12 +77,37 @@ static int empty_access(const char *path, int mask) {
     return 0;
 }
 static int empty_opendir(const char *path, struct fuse_file_info *fi) { 
+    int res = 0;
+    path++;
     printf( "Path from empty_opendir: %s\n", path );
-    return 0;
+    int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
+    if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
+        res = -ENOENT;
+    } else {
+        fi->fh = (unsigned long) fh;
+    }
+    return res;
 }
 static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-    printf( "Path from empty_readdir: %s\n", path );
-    return 0;
+    int res = 0;
+    (void) offset;
+    (void) fi;
+    path++;
+    int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
+    if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
+        res = -ENOENT;
+    } else {
+        fi->fh = (unsigned long) fh;
+        node buffer[MAX_FILE_AMOUNT];
+        int amount = get_assocs(path, na, MAX_ASSOC_AMOUNT, nodes, MAX_FILE_AMOUNT, buffer, MAX_FILE_AMOUNT);
+        if (amount != 0) {
+            int t;
+            for (t=0;t<amount;t++) {
+                filler(dbuf, buffer[t].nodename, NULL, 0);
+            }
+        }
+    }
+    return res;
 }
 static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
     printf( "Path from empty_releasedir: %s\n", path );
