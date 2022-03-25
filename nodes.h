@@ -13,7 +13,7 @@ typedef struct {
   const char * content;
 } node;
 
-int add_node(node *in, node into[], int length); 
+int add_node(node in, node into[], int length); 
 int remove_node(char *nodename, node into[], int length);
 void print_nodes(node into[], int length);
 node* get_node(char *nodename, node into[], int length); 

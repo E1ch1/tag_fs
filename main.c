@@ -44,7 +44,6 @@ static void *empty_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void) fi;
     int res = 0;
-
     printf( "Path from empty_getattr: %s\n", path );
 	
 	memset(stbuf, 0, sizeof(struct stat));
@@ -62,11 +61,16 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
         res = -ENOENT;
     } else {
         if (ter.node_type == NODE_TYPE_FILE){
-            stbuf->st_mode = S_IFREG | 0444;
+            stbuf->st_mode = ter.mode;
+            stbuf->st_uid = ter.uid;
+            stbuf->st_gid = ter.gid;
             stbuf->st_nlink = 1;
             stbuf->st_size = 0;
+            stbuf->st_size = sizeof(ter.content);
         } else {
-            stbuf->st_mode = S_IFDIR | 0755;
+            stbuf->st_mode = ter.mode;
+            stbuf->st_uid = ter.uid;
+            stbuf->st_gid = ter.gid;
 		    stbuf->st_nlink = 2;
         }
     }
@@ -78,8 +82,15 @@ static int empty_access(const char *path, int mask) {
 }
 static int empty_opendir(const char *path, struct fuse_file_info *fi) { 
     int res = 0;
-    path++;
     printf( "Path from empty_opendir: %s\n", path );
+
+    // Falls man das momentane Verzeichnis auslesen will
+    if (strcmp(path, "/") == 0) {
+        fi->fh = (unsigned long) 0;
+        return res;
+    }
+
+    path++;
     int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
     if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
         res = -ENOENT;
@@ -92,6 +103,22 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
     int res = 0;
     (void) offset;
     (void) fi;
+	
+    filler(dbuf, ".", NULL, 0);
+	filler(dbuf, "..", NULL, 0);
+
+    // Falls man das momentane Verzeichnis auslesen will
+    if (strcmp(path, "/") == 0) {
+        int t;
+        for (t=0;t<MAX_FILE_AMOUNT;t++) {
+            if (nodes[t].nodename != NULL && nodes[t].node_type == NODE_TYPE_TAG) {
+                //printf( "Found the following: %s\n", nodes[t].nodename );
+                filler(dbuf, nodes[t].nodename, NULL, 0);
+            }
+        }
+        return res;
+    }
+
     path++;
     int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
     if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
@@ -109,16 +136,27 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
     }
     return res;
 }
+static int empty_mkdir(const char *path, mode_t mode) {
+    path++;
+    char * buffer = strdup(path);
+    node xx = (node){
+        .nodename = buffer,
+        .node_type = NODE_TYPE_TAG,
+        .uid = getuid(),
+        .gid = getgid(),
+        .mode = S_IFDIR | 0777,
+        .last_access = time(NULL),
+        .content = NULL
+    };
+    int ret = add_node(xx, nodes, MAX_FILE_AMOUNT);
+    return ret;
+}
 static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
     printf( "Path from empty_releasedir: %s\n", path );
     return 0;
 }
 static int empty_readlink(const char *path, char *linkbuf, size_t size) {
     printf( "Path from empty_readlink: %s\n", path );
-    return 0;
-}
-static int empty_mkdir(const char *path, mode_t mode) {
-    printf( "Path from empty_mkdir: %s\n", path );
     return 0;
 }
 static int empty_mknod(const char *path, mode_t mode, dev_t rdev) {
@@ -228,11 +266,30 @@ int main(int argc, char *argv[])
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	args.argv[0][0] = '\0';
 
-    node f = (node){.nodename = "yeah.mp4", .node_type = NODE_TYPE_FILE};
-    add_node(&f, nodes, MAX_FILE_AMOUNT);
+    node pp = (node){.nodename = NULL, .node_type = NODE_TYPE_TAG};
+    add_node(pp, nodes, MAX_FILE_AMOUNT);
 
-    node ff = (node){.nodename = "Music", .node_type = NODE_TYPE_TAG};
-    add_node(&ff, nodes, MAX_FILE_AMOUNT);
+    node f = (node){
+        .nodename = "yeah.mp4", 
+        .node_type = NODE_TYPE_FILE,
+        .uid = getuid(),
+        .gid = getgid(),
+        .mode = S_IFREG | 0777,
+        .last_access = time(NULL),
+        .content = NULL
+    };
+    add_node(f, nodes, MAX_FILE_AMOUNT);
+
+    node ff = (node){
+        .nodename = "Music", 
+        .node_type = NODE_TYPE_TAG,
+        .uid = getuid(),
+        .gid = getgid(),
+        .mode = S_IFDIR | 0777,
+        .last_access = time(NULL),
+        .content = NULL
+    };
+    add_node(ff, nodes, MAX_FILE_AMOUNT);
 
     add_assoc("yeah.mp4", "Music", na, MAX_ASSOC_AMOUNT);
 

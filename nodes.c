@@ -1,11 +1,11 @@
 #include "nodes.h"
 #include <string.h>
-int add_node(node *in, node into[], int length) {
-
+int add_node(node in, node into[], int length) {
+  printf("Name of the node: %s\n", in.nodename);
   int p;
   for (p=0;p<length;p++) {
     if (into[p].nodename == NULL) {
-      into[p] = *in;
+      into[p] = in;
       return 0;
     }
   }
@@ -98,7 +98,7 @@ int get_assocs(
       if (strcmp(na[p].nodename2, ret->nodename) == 0) {
         node* temp = get_node(na[p].nodename1, nodes, nodes_length);
         if (temp != 0) {
-          add_node(temp, buffer, buffer_length);
+          add_node(*temp, buffer, buffer_length);
           return_value++;
         }
       }
@@ -106,7 +106,7 @@ int get_assocs(
       if (strcmp(na[p].nodename1, ret->nodename) == 0) {
         node* temp = get_node(na[p].nodename2, nodes, nodes_length);
         if (temp != 0) {
-          add_node(temp, buffer, buffer_length);
+          add_node(*temp, buffer, buffer_length);
           return_value++;
         }
       }
