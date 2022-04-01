@@ -25,6 +25,19 @@ int remove_node(char *nodename, node into[], int length) {
   return 1;
 }
 
+int rename_node(char *nodename, char * new_name, node into[], int length) {
+  int p;
+  for (p=0;p<length;p++) {
+    if (into[p].nodename != NULL) {
+      if (strcmp(into[p].nodename, nodename) == 0) {
+        into[p].nodename = new_name;
+        return 0;
+      }
+    }
+  }
+  return 1;
+}
+
 int search_node(char *nodename, node into[], int length) {
   int p;
   for (p=0;p<length;p++) {
@@ -123,7 +136,41 @@ int remove_assoc(const char * nodename1, const char * nodename2, node_assoc na[]
     if (na[p].nodename1 == nodename1 && na[p].nodename2 == nodename2) {
       na[p] = (node_assoc){};
       ret++;
+    } else if (na[p].nodename1 == nodename2 && na[p].nodename1 == nodename2) {
+			na[p] = (node_assoc){};
+      ret++;
+		}
+  }
+  return ret;
+}
+
+// removes all occurences where this nodename exists in either and returns amount removed
+int remove_assoc_single(const char * nodename1, node_assoc na[], int length) {
+  int p;
+  int ret = 0;
+  for(p=0;p<length;p++) {
+    if (na[p].nodename1 == nodename1 || na[p].nodename2 == nodename1) {
+      na[p] = (node_assoc){};
+      ret++;
     }
   }
   return ret;
 }
+
+// removes all occurences where this nodename exists in either and returns amount renamed
+int rename_assoc_single(const char * nodename1, const char * new_name, node_assoc na[], int length) {
+  int p;
+  int ret = 0;
+  for(p=0;p<length;p++) {
+    if (na[p].nodename1 == nodename1) {
+      na[p].nodename1 = new_name;
+      ret++;
+    } else if (na[p].nodename2 == nodename1) {
+      na[p].nodename2 = new_name;
+      ret++;
+		}
+  }
+  return ret;
+}
+
+

@@ -177,6 +177,7 @@ static int empty_rmdir(const char *path) {
 }
 static int empty_rename(const char *from, const char *to, unsigned int flags) {
     printf( "Path from empty_rename: %s\n", from );
+			
     return 0;
 }
 static int empty_link(const char *from, const char *to) {

@@ -13,8 +13,9 @@ typedef struct {
   const char * content;
 } node;
 
-int add_node(node in, node into[], int length); 
+int add_node(node in, node into[], int length);
 int remove_node(char *nodename, node into[], int length);
+int rename_node(char *nodename, char * new_name, node into[], int length);
 void print_nodes(node into[], int length);
 node* get_node(char *nodename, node into[], int length); 
 int get_node_fh(char *nodename, node into[], int length); 
@@ -35,3 +36,4 @@ int get_assocs(
     node buffer[], int buffer_length);
 
 int remove_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length);
+int remove_assoc_single(const char* nodename1, node_assoc na[], int length);
