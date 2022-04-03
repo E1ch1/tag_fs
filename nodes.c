@@ -1,5 +1,6 @@
 #include "nodes.h"
 #include <string.h>
+
 int add_node(node in, node into[], int length) {
   printf("Name of the node: %s\n", in.nodename);
   int p;
@@ -173,4 +174,6 @@ int rename_assoc_single(const char * nodename1, const char * new_name, node_asso
   return ret;
 }
 
-
+int add_default_assoc(char * nodename, node_assoc na[], int length) {
+	return add_assoc(nodename, ASSOC_DEFAULT_ROOT, na, length);
+}

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #define NODE_TYPE_FILE 0
 #define NODE_TYPE_TAG 1
+#define ASSOC_DEFAULT_ROOT "/" 
 
 // The defintion of a Single node, aka. File or Tag("Dir")
 typedef struct {
@@ -37,3 +38,4 @@ int get_assocs(
 
 int remove_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length);
 int remove_assoc_single(const char* nodename1, node_assoc na[], int length);
+int add_default_assoc(char * nodename, node_assoc na[], int length);

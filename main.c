@@ -46,12 +46,16 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
     int res = 0;
     printf( "Path from empty_getattr: %s\n", path );
 	
-	memset(stbuf, 0, sizeof(struct stat));
-	if (strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | 0755;
-		stbuf->st_nlink = 2;
-		return res;
-	}
+		memset(stbuf, 0, sizeof(struct stat));
+		if (strcmp(path, "/") == 0) {
+			node* n = get_node("/", nodes, MAX_FILE_AMOUNT);
+			printf("Came in here %s!\n", n->nodename);
+			//stbuf->st_mode = n->mode;
+			//stbuf->st_uid = n->uid;
+      //stbuf->st_gid = n->gid;
+			stbuf->st_nlink = 2;
+			return 0;
+		}
 
     char * path_new = strrchr(path, '/');
     path = path_new ? path_new + 1 : path;
@@ -71,7 +75,7 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
             stbuf->st_mode = ter.mode;
             stbuf->st_uid = ter.uid;
             stbuf->st_gid = ter.gid;
-		    stbuf->st_nlink = 2;
+		    		stbuf->st_nlink = 2;
         }
     }
 	return res;
@@ -103,9 +107,11 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
     int res = 0;
     (void) offset;
     (void) fi;
+    printf( "Path from empty_readdir: %s\n", path );
+
 	
     filler(dbuf, ".", NULL, 0);
-	filler(dbuf, "..", NULL, 0);
+	  filler(dbuf, "..", NULL, 0);
 
     // Falls man das momentane Verzeichnis auslesen will
     if (strcmp(path, "/") == 0) {
@@ -172,12 +178,33 @@ static int empty_unlink(const char *path) {
     return 0;
 }
 static int empty_rmdir(const char *path) {
-    printf( "Path from empty_rmdir: %s\n", path );
-    return 0;
+    printf( "Path from empty_rmdir: %s\n", path );	
+		int res = 0;
+		if (strcmp(path, "/") == 0) {
+			return -1;
+		}
+		path++; // So that the / will be removed
+
+		// Here we need to know if the tag itself should be deleted or ust the
+		// combination of the paths given
+		// TODO
+		int amount = 1;
+
+		if (amount <= 1) {
+			// If theres only the node left in the path, aka: /Music; NOT! /Documents/Music
+			int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
+			if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
+					res = -ENOENT;
+			} else {
+				remove_assoc_single(path, na, MAX_ASSOC_AMOUNT);
+				res = remove_node(path, nodes, MAX_FILE_AMOUNT);
+			}
+		}
+
+    return res;
 }
 static int empty_rename(const char *from, const char *to, unsigned int flags) {
     printf( "Path from empty_rename: %s\n", from );
-			
     return 0;
 }
 static int empty_link(const char *from, const char *to) {
@@ -267,7 +294,14 @@ int main(int argc, char *argv[])
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	args.argv[0][0] = '\0';
 
-    node pp = (node){.nodename = NULL, .node_type = NODE_TYPE_TAG};
+    node pp = (node){.nodename = ASSOC_DEFAULT_ROOT, 
+        .node_type = NODE_TYPE_TAG,
+        .uid = getuid(),
+        .gid = getgid(),
+        .mode = S_IFREG | 0777,
+        .last_access = time(NULL),
+        .content = NULL
+		};
     add_node(pp, nodes, MAX_FILE_AMOUNT);
 
     node f = (node){
