@@ -22,13 +22,13 @@ int main() {
 
   node buffer[MAX_FILE_AMOUNT] = {0};
   int ret = get_assocs("yeah.mp4",na, MAX_ASSOC_AMOUNT, nodes, MAX_FILE_AMOUNT, buffer, MAX_FILE_AMOUNT);
-  printf("%i\n", ret);
+  //printf("%i\n", ret);
 
   int ret2 = remove_assoc("yeah.mp4", "Music", na, MAX_ASSOC_AMOUNT);
-  printf("%i\n", ret2);
+  //printf("%i\n", ret2);
 
   int ret3 = get_assocs("yeah.mp4",na, MAX_ASSOC_AMOUNT, nodes, MAX_FILE_AMOUNT, buffer, MAX_FILE_AMOUNT);
-  printf("%i\n", ret3);
+  //printf("%i\n", ret3);
   
   print_nodes(nodes, MAX_FILE_AMOUNT);
 }
@@ -44,21 +44,52 @@ static void *empty_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void) fi;
     int res = 0;
-    printf( "Path from empty_getattr: %s\n", path );
 	
 		memset(stbuf, 0, sizeof(struct stat));
 		if (strcmp(path, "/") == 0) {
 			node* n = get_node("/", nodes, MAX_FILE_AMOUNT);
-			printf("Came in here %s!\n", n->nodename);
-			//stbuf->st_mode = n->mode;
-			//stbuf->st_uid = n->uid;
-      //stbuf->st_gid = n->gid;
+			stbuf->st_mode = S_IFDIR | 0755;
+      stbuf->st_uid = n->uid;
+      stbuf->st_gid = n->gid;
 			stbuf->st_nlink = 2;
 			return 0;
 		}
 
     char * path_new = strrchr(path, '/');
     path = path_new ? path_new + 1 : path;
+
+    
+    //char string[] = "abc/qwe/jkh";
+    char *array[MAX_FILE_AMOUNT];
+    int i = 0;
+
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
+    }
+    char * filename = array[kk-1];
+    //printf( "Filename from empty_getattr: %s\n", filename );
+
+    int fh = get_node_fh(filename, nodes, MAX_FILE_AMOUNT);
+    
+    
+    if (kk > 1) {
+        int tt;
+        for (tt=1; tt < kk; tt++) {
+            node buffer[MAX_FILE_AMOUNT];
+            int amount = is_assoc(filename, array[tt], na, MAX_ASSOC_AMOUNT);
+            if (amount == 0) {
+                return -ENOENT;
+            }
+        }
+    }
+    //printf("All Paths are valid assocs\n");
+
 
     node ter = *get_node(path, nodes, MAX_FILE_AMOUNT);
     if (ter.nodename == NULL) {
@@ -81,12 +112,12 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
 	return res;
 }
 static int empty_access(const char *path, int mask) {    
-    printf( "Path from empty_access: %s\n", path );
+    //printf( "Path from empty_access: %s\n", path );
     return 0;
 }
 static int empty_opendir(const char *path, struct fuse_file_info *fi) { 
     int res = 0;
-    printf( "Path from empty_opendir: %s\n", path );
+    //printf( "Path from empty_opendir: %s\n", path );
 
     // Falls man das momentane Verzeichnis auslesen will
     if (strcmp(path, "/") == 0) {
@@ -107,7 +138,7 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
     int res = 0;
     (void) offset;
     (void) fi;
-    printf( "Path from empty_readdir: %s\n", path );
+    ////printf( "Path from empty_readdir: %s\n", path );
 
 	
     filler(dbuf, ".", NULL, 0);
@@ -116,11 +147,9 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
     // Falls man das momentane Verzeichnis auslesen will
     if (strcmp(path, "/") == 0) {
         int t;
-        for (t=0;t<MAX_FILE_AMOUNT;t++) {
-            if (nodes[t].nodename != NULL && nodes[t].node_type == NODE_TYPE_TAG) {
-                //printf( "Found the following: %s\n", nodes[t].nodename );
-                filler(dbuf, nodes[t].nodename, NULL, 0);
-            }
+        for (t=1;t<MAX_FILE_AMOUNT;t++) {
+          if (nodes[t].nodename == NULL) break;
+          filler(dbuf, nodes[t].nodename, NULL, 0);
         }
         return res;
     }
@@ -157,38 +186,122 @@ static int empty_mkdir(const char *path, mode_t mode) {
     int ret = add_node(xx, nodes, MAX_FILE_AMOUNT);
     return ret;
 }
+static int empty_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+    //printf( "Path from empty_create: %s\n", path );
+    (void) fi;
+    int res = 0;
+	
+		if (strcmp(path, "/") == 0) {
+      fi->fh = (unsigned long) 0;
+			return 0;
+		}
+
+    char * path_new = strrchr(path, '/');
+    path = path_new ? path_new + 1 : path;
+
+    
+    //char string[] = "abc/qwe/jkh";
+    char *array[MAX_FILE_AMOUNT];
+    int i = 0;
+
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
+    }
+    char * filename = array[kk-1];
+    //printf( "Filename from empty_getattr: %s\n", filename );
+
+    int fh = get_node_fh(filename, nodes, MAX_FILE_AMOUNT);
+    
+    
+    if (kk > 1) {
+        int tt;
+        for (tt=1; tt < kk; tt++) {
+            node buffer[MAX_FILE_AMOUNT];
+            int amount = is_assoc(filename, array[tt], na, MAX_ASSOC_AMOUNT);
+            if (amount == 0) {
+                return 1;
+            }
+        }
+    }
+    char * buffer = strdup(filename);
+    kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        printf("Current file thingie %s\n", array[kk]);
+        if (array[kk] == NULL) break;
+        if (strcmp(array[kk], filename) == 0) {
+          node pp = (node){.nodename = buffer, 
+            .node_type = NODE_TYPE_TAG,
+            .uid = getuid(),
+            .gid = getgid(),
+            .mode = S_IFREG | 0777,
+            .last_access = time(NULL),
+            .content = NULL
+          };
+          add_node(pp, nodes, MAX_FILE_AMOUNT);
+        }
+        else { 
+          char * bb = strdup(array[kk]);
+          add_assoc(bb, filename, na, MAX_ASSOC_AMOUNT);
+        }
+    }
+    return 0;
+}
 static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_releasedir: %s\n", path );
+    //printf( "Path from empty_releasedir: %s\n", path );
     return 0;
 }
 static int empty_readlink(const char *path, char *linkbuf, size_t size) {
-    printf( "Path from empty_readlink: %s\n", path );
+    //printf( "Path from empty_readlink: %s\n", path );
     return 0;
 }
 static int empty_mknod(const char *path, mode_t mode, dev_t rdev) {
-    printf( "Path from empty_mknod: %s\n", path );
+    //printf( "Path from empty_mknod: %s\n", path );
     return 0;
 }
 static int empty_symlink(const char *from, const char *to) {
-    printf( "Path from empty_symlink: %s\n", from );
+    //printf( "Path from empty_symlink: %s\n", from );
     return 0;
 }
 static int empty_unlink(const char *path) {
-    printf( "Path from empty_unlink: %s\n", path );
+    //printf( "Path from empty_unlink: %s\n", path );
     return 0;
 }
 static int empty_rmdir(const char *path) {
-    printf( "Path from empty_rmdir: %s\n", path );	
+    //printf( "Path from empty_rmdir: %s\n", path );	
 		int res = 0;
 		if (strcmp(path, "/") == 0) {
 			return -1;
 		}
 		path++; // So that the / will be removed
 
+    char *array[MAX_FILE_AMOUNT];
+    int i = 0;
+
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int amount = 0;
+    for (amount = 0; amount < MAX_FILE_AMOUNT; amount++) {
+        if (array[amount] == NULL) break;
+    }
+    char * filename = array[amount-1];
+
+    node* n = get_node(filename, nodes, MAX_FILE_AMOUNT);
+    if (n->nodename == NULL || n->node_type == NODE_TYPE_FILE) {
+        return -ENOENT;
+    }
+
 		// Here we need to know if the tag itself should be deleted or ust the
 		// combination of the paths given
 		// TODO
-		int amount = 1;
 
 		if (amount <= 1) {
 			// If theres only the node left in the path, aka: /Music; NOT! /Documents/Music
@@ -199,64 +312,62 @@ static int empty_rmdir(const char *path) {
 				remove_assoc_single(path, na, MAX_ASSOC_AMOUNT);
 				res = remove_node(path, nodes, MAX_FILE_AMOUNT);
 			}
-		}
+		} else {
+      
+    }
 
     return res;
 }
 static int empty_rename(const char *from, const char *to, unsigned int flags) {
-    printf( "Path from empty_rename: %s\n", from );
+    //printf( "Path from empty_rename: %s\n", from );
     return 0;
 }
 static int empty_link(const char *from, const char *to) {
-    printf( "Path from empty_link: %s\n", from );
+    //printf( "Path from empty_link: %s\n", from );
     return 0;
 }
 static int empty_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    printf( "Path from empty_chmod: %s\n", path );
+    //printf( "Path from empty_chmod: %s\n", path );
     return 0;
 }
 static int empty_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
-    printf( "Path from empty_chown: %s\n", path );
+    //printf( "Path from empty_chown: %s\n", path );
     return 0;
 }
 static int empty_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
-  (void) fi;
-  return 0;
+    (void) fi;
+    return 0;
 }
 static int empty_open(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_open: %s\n", path );
+    //printf( "Path from empty_open: %s\n", path );
     return 0;
 }
 static int empty_flush(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_flush: %s\n", path );
+    //printf( "Path from empty_flush: %s\n", path );
     return 0;
 }
 static int empty_fsync(const char *path, int isdatasync, struct fuse_file_info *fi) {
-    printf( "Path from empty_fsync: %s\n", path );
+    //printf( "Path from empty_fsync: %s\n", path );
     return 0;
 }
 static int empty_release(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_release: %s\n", path );
+    //printf( "Path from empty_release: %s\n", path );
     return 0;
 }
 static int empty_read(const char *path, char *rbuf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    printf( "Path from empty_read: %s\n", path );
+    //printf( "Path from empty_read: %s\n", path );
     return 0;
 }
 static int empty_write(const char *path, const char *wbuf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    printf( "Path from empty_write: %s\n", path );
+    //printf( "Path from empty_write: %s\n", path );
     return 0;
 }
 static int empty_statfs(const char *path, struct statvfs *buf) {
-    printf( "Path from empty_statfs: %s\n", path );
-    return 0;
-}
-static int empty_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    printf( "Path from empty_create: %s\n", path );
+    //printf( "Path from empty_statfs: %s\n", path );
     return 0;
 }
 static int empty_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
-    printf( "Path from empty_truncate: %s\n", path );
+    //printf( "Path from empty_truncate: %s\n", path );
     return 0;
 }
 static struct fuse_operations hello_oper = {
@@ -314,6 +425,7 @@ int main(int argc, char *argv[])
         .content = NULL
     };
     add_node(f, nodes, MAX_FILE_AMOUNT);
+    add_default_assoc(f.nodename, na, MAX_ASSOC_AMOUNT);
 
     node ff = (node){
         .nodename = "Music", 
@@ -325,6 +437,7 @@ int main(int argc, char *argv[])
         .content = NULL
     };
     add_node(ff, nodes, MAX_FILE_AMOUNT);
+    add_default_assoc(ff.nodename, na, MAX_ASSOC_AMOUNT);
 
     add_assoc("yeah.mp4", "Music", na, MAX_ASSOC_AMOUNT);
 

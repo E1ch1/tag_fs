@@ -38,4 +38,5 @@ int get_assocs(
 
 int remove_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length);
 int remove_assoc_single(const char* nodename1, node_assoc na[], int length);
+int is_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length);
 int add_default_assoc(char * nodename, node_assoc na[], int length);

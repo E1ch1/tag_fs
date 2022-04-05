@@ -177,3 +177,14 @@ int rename_assoc_single(const char * nodename1, const char * new_name, node_asso
 int add_default_assoc(char * nodename, node_assoc na[], int length) {
 	return add_assoc(nodename, ASSOC_DEFAULT_ROOT, na, length);
 }
+
+int is_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length) {
+  int p;
+  int ret = 0;
+  for(p=0;p<length;p++) {
+    if (na[p].nodename1 == nodename1 && na[p].nodename2 == nodename2) {
+      ret++;
+    }
+  }
+  return ret;
+}
