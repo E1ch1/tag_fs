@@ -13,8 +13,6 @@
 #define MAX_ASSOC_AMOUNT 256
 
 int CURRENT_FD = 1;
-node nodes[MAX_FILE_AMOUNT] = { 0 };
-node_assoc na[MAX_ASSOC_AMOUNT] = { 0 };
 
 link* nodes_hm; // All Nodes in a Hashmap
 link* assoc_hm; // All assocs in a Hashmap
@@ -23,8 +21,8 @@ link* nodes_fd_hm; // All filedescriptor in a Hashmap
 static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void) fi;
     int res = 0;
+    log_debug( "Path from empty_getattr: %s", path );
 
-    printf( "Path from empty_getattr: %s\n", path );
 	
 		memset(stbuf, 0, sizeof(struct stat));
 		if (strcmp(path, "/") == 0) {
@@ -60,7 +58,6 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
     char * filename = array[kk-1];
     
     node *ter = hm_get(nodes_hm, filename);
-    printf("%s\n", ter->nodename);
     if (ter == NULL) {
       return -ENOENT;
     }
@@ -80,7 +77,7 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
 	return res;
 }
 static int empty_access(const char *path, int mask) {    
-    printf( "Path from empty_access: %s\n", path );
+    log_debug( "Path from empty_access: %s", path );
     return 0;
 }
 static int empty_opendir(const char *path, struct fuse_file_info *fi) { 
@@ -97,96 +94,69 @@ static int empty_opendir(const char *path, struct fuse_file_info *fi) {
     if (nn == NULL) {
       return -ENOENT;
     }
-    hm_set(nodes_fd_hm, CURRENT_FD, nn);
-    printf( "Path from empty_opendir: \n", path );
+    hm_set_int(nodes_fd_hm, CURRENT_FD, nn);
+    log_debug( "Path from empty_opendir: \n", path );
     fi->fh = (unsigned long) CURRENT_FD;
     CURRENT_FD++;
     return res;
 }
 static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-    int res = 0;
-    (void) offset;
-    (void) fi;
-      printf( "Path from empty_readdir: %s\n", path );
+  int res = 0;
+  (void) offset;
+  (void) fi;
+    log_debug( "Path from empty_readdir: %s", path );
 
-	
-    filler(dbuf, ".", NULL, 0, 0);
-	  filler(dbuf, "..", NULL, 0, 0);
 
-    // Falls man das momentane Verzeichnis auslesen will
-    if (strcmp(path, "/") == 0) {
-      node* n = hm_get(nodes_hm, ASSOC_DEFAULT_ROOT);
-      if (n == NULL) {
-        return -ENOENT;
-      }
-      
-      char* t;
-      link* temp = nodes_hm;
-      while(temp->next != NULL) {
-        temp = temp->next;
-        printf("%s\n", temp->name);
-        t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
-        sprintf(t, "%s-%s", ASSOC_DEFAULT_ROOT, temp->name);
-        printf("%s\n", t);
-        node_assoc *vv = hm_get(assoc_hm, t);
-        if (vv != NULL) {
-          filler(dbuf, temp->name, NULL, 0, 0);
-        }
-      } 
-      fi->fh = (unsigned long) 0; 
-      return res;
+  filler(dbuf, ".", NULL, 0, 0);
+  filler(dbuf, "..", NULL, 0, 0);
+
+  // Falls man das momentane Verzeichnis auslesen will
+  if (strcmp(path, "/") == 0) {
+    node* n = hm_get(nodes_hm, ASSOC_DEFAULT_ROOT);
+    if (n == NULL) {
+      return -ENOENT;
     }
-
-    path++;
-
-   /*
-    int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
-    if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
-        res = -ENOENT;
-    } else {
-        fi->fh = (unsigned long) fh;
-        node buffer[MAX_FILE_AMOUNT];
-        int amount = get_assocs(path, na, MAX_ASSOC_AMOUNT, nodes, MAX_FILE_AMOUNT, buffer, MAX_FILE_AMOUNT);
-        if (amount != 0) {
-            int t;
-            for (t=0;t<amount;t++) {
-                filler(dbuf, buffer[t].nodename, NULL, 0, 0);
-            }
-        }
-    }
-    */
-    return res;
-}
-static int empty_mkdir(const char *path, mode_t mode) {
-    path++;
-    char * buffer = strdup(path);
-    node xx = (node){
-        .nodename = buffer,
-        .node_type = NODE_TYPE_TAG,
-        .uid = getuid(),
-        .gid = getgid(),
-        .mode = S_IFDIR | 0777,
-        .last_access = time(NULL),
-        .content = NULL
-    };
-    int ret = add_node(xx, nodes, MAX_FILE_AMOUNT);
-    return ret;
-}
-static int empty_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    printf( "Path from empty_create: %s\n", path );
-    (void) fi;
-    int res = 0;
-	
-		if (strcmp(path, "/") == 0) {
-      fi->fh = (unsigned long) 0;
-			return 0;
-		}
-
-    char * path_new = strrchr(path, '/');
-    path = path_new ? path_new + 1 : path;
-
     
-    //char string[] = "abc/qwe/jkh";
+    char* t;
+    link* temp = nodes_hm;
+    while(temp->next != NULL) {
+      temp = temp->next;
+      t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
+      sprintf(t, "%s-%s", ASSOC_DEFAULT_ROOT, temp->name);
+      node_assoc *vv = hm_get(assoc_hm, t);
+      if (vv != NULL) {
+        filler(dbuf, temp->name, NULL, 0, 0);
+      }
+    } 
+    fi->fh = (unsigned long) 0; 
+    return res;
+  }
+
+  path++;
+  node *n = hm_get(nodes_hm, path);
+  if (n == NULL) {
+    return -ENOENT;
+  }
+  hm_set_int(nodes_fd_hm, CURRENT_FD, n);
+  fi->fh = (unsigned long) CURRENT_FD;
+  CURRENT_FD++;
+
+  char* t;
+  link* temp = nodes_hm;
+  while(temp->next != NULL) {
+    temp = temp->next;
+    t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(path)+sizeof(char)+1);
+    sprintf(t, "%s-%s", path, temp->name);
+    node_assoc *vv = hm_get(assoc_hm, t);
+    if (vv != NULL) {
+      filler(dbuf, temp->name, NULL, 0, 0);
+    }
+  }
+  return res;
+}
+static int empty_mkdir(const char *path_in, mode_t mode) {
+    int ret = 0;
+    char * path = strdup(path_in);
     char *array[MAX_FILE_AMOUNT];
     int i = 0;
 
@@ -200,73 +170,68 @@ static int empty_create(const char *path, mode_t mode, struct fuse_file_info *fi
         if (array[kk] == NULL) break;
     }
     char * filename = array[kk-1];
-    printf( "Filename from empty_getattr: %s\n", filename );
 
-    int fh = get_node_fh(filename, nodes, MAX_FILE_AMOUNT);
-    
-    
-    if (kk > 1) {
-        int tt;
-        for (tt=1; tt < kk; tt++) {
-            node buffer[MAX_FILE_AMOUNT];
-            int amount = is_assoc(filename, array[tt], na, MAX_ASSOC_AMOUNT);
-            if (amount == 0) {
-                return 1;
-            }
-        }
+    // Dont know if i need it
+    // Tests all paths beforehand with getattr
+    /*
+    i = 0;
+    while(array[i] != NULL) {
+      node *nn = hm_get(nodes_hm, array[i++]);
+      if (nn == NULL) {
+        return -ENOENT;
+      }
     }
-    char * buffer = strdup(filename);
-    kk = 0;
-    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
-        printf("Current file thingie %s\n", array[kk]);
-        if (array[kk] == NULL) break;
-        if (strcmp(array[kk], filename) == 0) {
-          node pp = (node){.nodename = buffer, 
-            .node_type = NODE_TYPE_TAG,
-            .uid = getuid(),
-            .gid = getgid(),
-            .mode = S_IFREG | 0777,
-            .last_access = time(NULL),
-            .content = NULL
-          };
-          add_node(pp, nodes, MAX_FILE_AMOUNT);
-        }
-        else { 
-          char * bb = strdup(array[kk]);
-          add_assoc(bb, filename, na, MAX_ASSOC_AMOUNT);
-        }
-    }
-    return 0;
+    */
+    
+    node *ff = malloc(sizeof(node));
+    ff->nodename = filename; 
+    ff->node_type = NODE_TYPE_TAG;
+    ff->uid = getuid();
+    ff->gid = getgid();
+    ff->mode = S_IFDIR | 0777;
+    ff->last_access = time(NULL);
+    ff->content = NULL;
+    hm_set(nodes_hm, ff->nodename, ff);
+
+
+    if (i <= 1) {
+      node_assoc *ff_na = malloc(sizeof(node_assoc));
+      ff_na->nodename1 = ff->nodename;
+      ff_na->nodename2 = ASSOC_DEFAULT_ROOT;
+
+      char* tt = malloc(sizeof(char)*strlen(ff->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
+      sprintf(tt, "%s-%s", ASSOC_DEFAULT_ROOT, ff->nodename);
+      hm_set(assoc_hm, tt, ff_na);
+    } else {
+      int p = 1;
+      while (array[p] != NULL) {
+        char * tpath = strdup(array[p]);
+        node_assoc *ff_na = malloc(sizeof(node_assoc));
+        ff_na->nodename1 = ff->nodename;
+        ff_na->nodename2 = tpath;
+
+        char* tt = malloc(sizeof(char)*strlen(ff->nodename)+sizeof(char)*strlen(tpath)+sizeof(char)+1);
+        sprintf(tt, "%s-%s", tpath, ff->nodename);
+        hm_set(assoc_hm, tt, ff_na);
+
+      }
+
+    } 
+    return ret;
 }
-static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_releasedir: %s\n", path );
-    return 0;
-}
-static int empty_readlink(const char *path, char *linkbuf, size_t size) {
-    printf( "Path from empty_readlink: %s\n", path );
-    return 0;
-}
-static int empty_mknod(const char *path, mode_t mode, dev_t rdev) {
-    printf( "Path from empty_mknod: %s\n", path );
-    return 0;
-}
-static int empty_symlink(const char *from, const char *to) {
-    printf( "Path from empty_symlink: %s\n", from );
-    return 0;
-}
-static int empty_unlink(const char *path) {
-    printf( "Path from empty_unlink: %s\n", path );
-    return 0;
-}
-static int empty_rmdir(const char *path) {
-    printf( "Path from empty_rmdir: %s\n", path );	
-		int res = 0;
-		if (strcmp(path, "/") == 0) {
-			return -1;
+static int empty_create(const char *path_in, mode_t mode, struct fuse_file_info *fi) {
+    log_debug( "Path from empty_create: %s", path_in );
+    (void) fi;
+    int res = 0;
+	
+		if (strcmp(path_in, "/") == 0) {
+      fi->fh = (unsigned long) 0;
+			return 0;
 		}
-		path++; // So that the / will be removed
-
-    char *array[MAX_FILE_AMOUNT];
+    int ret = 0;
+    path_in++;
+    char * path = strdup(path_in);
+    char * array[MAX_FILE_AMOUNT];
     int i = 0;
 
     array[i] = strtok(path, "/");
@@ -274,50 +239,142 @@ static int empty_rmdir(const char *path) {
     while(array[i] != NULL)
         array[++i] = strtok(NULL, "/");
     
-    int amount = 0;
-    for (amount = 0; amount < MAX_FILE_AMOUNT; amount++) {
-        if (array[amount] == NULL) break;
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
     }
-    char * filename = array[amount-1];
+    char * filename = array[kk-1];
 
-    node* n = get_node(filename, nodes, MAX_FILE_AMOUNT);
-    if (n->nodename == NULL || n->node_type == NODE_TYPE_FILE) {
-        return -ENOENT;
+    char * buffer = strdup(filename);
+
+    node *f = malloc(sizeof(node));
+    f->nodename = buffer;
+    f->node_type = NODE_TYPE_FILE;
+    f->uid = getuid();
+    f->gid = getgid();
+    f->mode = S_IFREG | 0777;
+    f->last_access = time(NULL);
+    f->content = NULL;
+    hm_set(nodes_hm, f->nodename, f);
+
+    if (i <= 1) {
+      node_assoc *f_na = malloc(sizeof(node_assoc));
+      f_na->nodename1 = f->nodename;
+      f_na->nodename2 = ASSOC_DEFAULT_ROOT;
+
+      char* t = malloc(sizeof(char)*strlen(f->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
+      sprintf(t, "%s-%s", ASSOC_DEFAULT_ROOT, f->nodename);
+      hm_set(assoc_hm, t, f_na);
+
+    } else {
+      // Alle Verbindungen setzen
+      int i = 0;
+      while(array[i] != NULL) {
+        node *nn = hm_get(nodes_hm, array[i]);
+        if (nn != NULL) {
+          char * tpath = strdup(array[i]);
+          node_assoc *f_na = malloc(sizeof(node_assoc));
+          f_na->nodename1 = f->nodename;
+          f_na->nodename2 = nn->nodename;
+
+          char* t = malloc(sizeof(char)*strlen(f->nodename)+sizeof(char)*strlen(nn->nodename)+sizeof(char)+1);
+          sprintf(t, "%s-%s", tpath, f->nodename);
+          hm_set(assoc_hm, t, f_na);
+        }
+        i++;
+      }
     }
 
-		// Here we need to know if the tag itself should be deleted or ust the
-		// combination of the paths given
-		// TODO
+    return 0;
+}
+static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
+    log_debug( "Path from empty_releasedir: %s", path );
+    return 0;
+}
+static int empty_readlink(const char *path, char *linkbuf, size_t size) {
+    log_debug( "Path from empty_readlink: %s", path );
+    return 0;
+}
+static int empty_mknod(const char *path, mode_t mode, dev_t rdev) {
+    log_debug( "Path from empty_mknod: %s", path );
+    return 0;
+}
+static int empty_symlink(const char *from, const char *to) {
+    log_debug( "Path from empty_symlink: %s", from );
+    return 0;
+}
+static int empty_unlink(const char *path) {
+    log_debug( "Path from empty_unlink: %s", path );
+    return 0;
+}
+static int empty_rmdir(const char *path_in) {
+    log_debug( "Path from empty_rmdir: %s", path_in );	
+    int res = 0;
+	
+		if (strcmp(path_in, "/") == 0) {
+			return 1;
+		}
+    int ret = 0;
+    path_in++;
+    char * path = strdup(path_in);
+    char * array[MAX_FILE_AMOUNT];
+    int i = 0;
 
-		if (amount <= 1) {
-			// If theres only the node left in the path, aka: /Music; NOT! /Documents/Music
-			int fh = get_node_fh(path, nodes, MAX_FILE_AMOUNT);
-			if (fh == NULL || nodes[fh].node_type == NODE_TYPE_FILE) {
-					res = -ENOENT;
-			} else {
-				remove_assoc_single(path, na, MAX_ASSOC_AMOUNT);
-				res = remove_node(path, nodes, MAX_FILE_AMOUNT);
-			}
-		} else {
-      
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
+    }
+    char * filename = array[kk-1];
+    log_debug( "File from empty_rmdir: %s", path );
+
+    node *n = hm_get(nodes_hm, filename);
+    if (n == NULL) {
+      return -ENOENT;
     }
 
+    char* t;
+    link* temp = nodes_hm;
+    while(temp->next != NULL) {
+      temp = temp->next;
+      t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(path)+sizeof(char)+1);
+      sprintf(t, "%s-%s", path, temp->name);
+      node_assoc *vv = hm_get(assoc_hm, t);
+      if (vv != NULL) {
+        int i = hm_remove(assoc_hm, t);
+        if (i != 0) {
+          log_warn("Could not complete deletion of %s", t);
+        }
+        log_info("Assoc %s has been deleted!", t);
+        free(vv);
+      }
+    }
+    i = hm_remove(nodes_hm, filename);
+    if (i != 0) {
+      log_warn("Could not complete deletion of %s", filename);
+      return -ENOENT;
+    }
+    log_info("Folder %s has been deleted!", filename);
     return res;
 }
 static int empty_rename(const char *from, const char *to, unsigned int flags) {
-    printf( "Path from empty_rename: %s\n", from );
+    log_debug( "Path from empty_rename: %s", from );
     return 0;
 }
 static int empty_link(const char *from, const char *to) {
-    printf( "Path from empty_link: %s\n", from );
+    log_debug( "Path from empty_link: %s", from );
     return 0;
 }
 static int empty_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    printf( "Path from empty_chmod: %s\n", path );
+    log_debug( "Path from empty_chmod: %s", path );
     return 0;
 }
 static int empty_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
-    printf( "Path from empty_chown: %s\n", path );
+    log_debug( "Path from empty_chown: %s", path );
     return 0;
 }
 static int empty_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
@@ -325,35 +382,35 @@ static int empty_utimens(const char *path, const struct timespec tv[2], struct f
     return 0;
 }
 static int empty_open(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_open: %s\n", path );
+    log_debug( "Path from empty_open: %s", path );
     return 0;
 }
 static int empty_flush(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_flush: %s\n", path );
+    log_debug( "Path from empty_flush: %s", path );
     return 0;
 }
 static int empty_fsync(const char *path, int isdatasync, struct fuse_file_info *fi) {
-    printf( "Path from empty_fsync: %s\n", path );
+    log_debug( "Path from empty_fsync: %s", path );
     return 0;
 }
 static int empty_release(const char *path, struct fuse_file_info *fi) {
-    printf( "Path from empty_release: %s\n", path );
+    log_debug( "Path from empty_release: %s", path );
     return 0;
 }
 static int empty_read(const char *path, char *rbuf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    printf( "Path from empty_read: %s\n", path );
+    log_debug( "Path from empty_read: %s", path );
     return 0;
 }
 static int empty_write(const char *path, const char *wbuf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    printf( "Path from empty_write: %s\n", path );
+    log_debug( "Path from empty_write: %s", path );
     return 0;
 }
 static int empty_statfs(const char *path, struct statvfs *buf) {
-    printf( "Path from empty_statfs: %s\n", path );
+    log_debug( "Path from empty_statfs: %s", path );
     return 0;
 }
 static int empty_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
-    printf( "Path from empty_truncate: %s\n", path );
+    log_debug( "Path from empty_truncate: %s", path );
     return 0;
 }
 static struct fuse_operations hello_oper = {
@@ -443,6 +500,10 @@ void test_scene() {
   ff_na->nodename1 = ff->nodename;
   ff_na->nodename2 = ASSOC_DEFAULT_ROOT;
 
+  char* tt = malloc(sizeof(char)*strlen(ff->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
+  sprintf(tt, "%s-%s", ASSOC_DEFAULT_ROOT, ff->nodename);
+  hm_set(assoc_hm, tt, ff_na);
+
   node_assoc *f_na = malloc(sizeof(node_assoc));
   f_na->nodename1 = f->nodename;
   f_na->nodename2 = ASSOC_DEFAULT_ROOT;
@@ -451,7 +512,11 @@ void test_scene() {
   sprintf(t, "%s-%s", ASSOC_DEFAULT_ROOT, f->nodename);
   hm_set(assoc_hm, t, f_na);
 
-  char* tt = malloc(sizeof(char)*strlen(ff->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
-  sprintf(tt, "%s-%s", ASSOC_DEFAULT_ROOT, ff->nodename);
-  hm_set(assoc_hm, tt, ff_na);
+  node_assoc *fff_na = malloc(sizeof(node_assoc));
+  fff_na->nodename1 = f->nodename;
+  fff_na->nodename2 = ff->nodename;
+
+  char* ttt = malloc(sizeof(char)*strlen(f->nodename)+sizeof(char)*strlen(ff->nodename)+sizeof(char)+1);
+  sprintf(ttt, "%s-%s", ff->nodename, f->nodename);
+  hm_set(assoc_hm, ttt, fff_na);
 }

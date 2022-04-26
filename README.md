@@ -3,6 +3,16 @@
 ## About
 This is a Filsystem that wants to "order" Files in Tags rather then Folders. Although the mounting would suggests that there are Folders, there aren't, Folders are just the way to represent the tags.
 
+## Prerequisites
+
+You need to have libfuse3 isntalled. \
+This can be done via a Package manager or directly from the Git: https://github.com/libfuse/libfuse \
+
+```
+apt install libfuse3-dev
+```
+Or any other Package Manager that has the version 3 of libfuse. \
+
 ## Idea
 
 ```bash

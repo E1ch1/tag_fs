@@ -80,6 +80,31 @@ link * hm_set(link* in, char* name, void* item) {
   return l;
 }
 
+void * hm_get_int(link *in, int name) {
+  if ((int)(in->name) == name) {
+    return in->val;
+  }
+  if (in->next != NULL) {
+    return hm_get_int(in->next, name);
+  }
+  return NULL;
+}
+
+link * hm_set_int(link* in, int name, void* item) {
+  link *tmp = hm_get_int(in, name);
+  if (tmp != NULL) {
+    tmp->val = item;
+    return tmp;
+  }
+
+  link *l = malloc(sizeof(link));
+  l->name = &name;
+  l->val = item;
+  link* last = (link*) get_last(in);
+  last->next = l;
+  return l;
+}
+
 
 /*
 int main() {
