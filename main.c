@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <search.h>
+#include <math.h>
 
 #define MAX_FILE_AMOUNT 256
 #define MAX_ASSOC_AMOUNT 256
@@ -17,6 +18,37 @@ int CURRENT_FD = 1;
 link* nodes_hm; // All Nodes in a Hashmap
 link* assoc_hm; // All assocs in a Hashmap
 link* nodes_fd_hm; // All filedescriptor in a Hashmap
+
+
+// Source @: https://localcoder.org/generate-random-64-bit-integer
+signed rand256() {
+    static unsigned const limit = RAND_MAX - RAND_MAX % 256;
+    unsigned result = rand();
+    while ( result >= limit ) {
+        result = rand();
+    }
+    return result % 256;
+}
+
+unsigned long long rand64bits() {
+    unsigned long long results = 0ULL;
+    for ( int count = 8; count > 0; -- count ) {
+        results = 256U * results + rand256();
+    }
+    results >> 1;
+    return results;
+}
+
+unsigned long long getNextFH (char* name) {
+  while(1) {
+    unsigned long long temp = rand64bits();
+    char* tt = hm_get_int(nodes_fd_hm, temp);
+    if (tt == NULL) {
+      link *l = hm_set_int(nodes_fd_hm, temp, name);
+      return temp;
+    }
+  }
+}
 
 static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void) fi;
@@ -85,8 +117,8 @@ static int empty_opendir(const char *path, struct fuse_file_info *fi) {
 
     // Falls man das momentane Verzeichnis auslesen will
     if (strcmp(path, "/") == 0) {
-        fi->fh = (unsigned long) 0;
-        return res;
+      fi->fh = (unsigned long) getNextFH(ASSOC_DEFAULT_ROOT);
+      return res;
     }
 
     path++;
@@ -94,10 +126,7 @@ static int empty_opendir(const char *path, struct fuse_file_info *fi) {
     if (nn == NULL) {
       return -ENOENT;
     }
-    hm_set_int(nodes_fd_hm, CURRENT_FD, nn);
-    log_debug( "Path from empty_opendir: \n", path );
-    fi->fh = (unsigned long) CURRENT_FD;
-    CURRENT_FD++;
+    fi->fh = (unsigned long) getNextFH(path);
     return res;
 }
 static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
@@ -128,7 +157,6 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
         filler(dbuf, temp->name, NULL, 0, 0);
       }
     } 
-    fi->fh = (unsigned long) 0; 
     return res;
   }
 
@@ -137,9 +165,6 @@ static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, o
   if (n == NULL) {
     return -ENOENT;
   }
-  hm_set_int(nodes_fd_hm, CURRENT_FD, n);
-  fi->fh = (unsigned long) CURRENT_FD;
-  CURRENT_FD++;
 
   char* t;
   link* temp = nodes_hm;
@@ -224,8 +249,7 @@ static int empty_create(const char *path_in, mode_t mode, struct fuse_file_info 
     (void) fi;
     int res = 0;
 	
-		if (strcmp(path_in, "/") == 0) {
-      fi->fh = (unsigned long) 0;
+		if (strcmp(path_in, "/") == 0) { 
 			return 0;
 		}
     int ret = 0;
@@ -288,23 +312,11 @@ static int empty_create(const char *path_in, mode_t mode, struct fuse_file_info 
     return 0;
 }
 static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
-    log_debug( "Path from empty_releasedir: %s", path );
-    return 0;
-}
-static int empty_readlink(const char *path, char *linkbuf, size_t size) {
-    log_debug( "Path from empty_readlink: %s", path );
-    return 0;
-}
-static int empty_mknod(const char *path, mode_t mode, dev_t rdev) {
-    log_debug( "Path from empty_mknod: %s", path );
-    return 0;
-}
-static int empty_symlink(const char *from, const char *to) {
-    log_debug( "Path from empty_symlink: %s", from );
-    return 0;
-}
-static int empty_unlink(const char *path) {
-    log_debug( "Path from empty_unlink: %s", path );
+    log_debug( "empty_releasedir: Path from empty_releasedir: %s", path );
+    log_debug( "empty_releasedir: FH: %u", fi->fh );
+    hm_remove_int(nodes_fd_hm, fi->fh);
+    log_debug( "empty_releasedir: Amount of open Filehandles: %i", hm_length(nodes_fd_hm) );
+
     return 0;
 }
 static int empty_rmdir(const char *path_in) {
@@ -343,30 +355,36 @@ static int empty_rmdir(const char *path_in) {
       temp = temp->next;
       t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(path)+sizeof(char)+1);
       sprintf(t, "%s-%s", path, temp->name);
+      log_debug("Trying to delete %s", t);
       node_assoc *vv = hm_get(assoc_hm, t);
       if (vv != NULL) {
-        int i = hm_remove(assoc_hm, t);
-        if (i != 0) {
-          log_warn("Could not complete deletion of %s", t);
+        link *ii = hm_remove(assoc_hm, t);
+        if (ii==NULL) {
+          log_warn("Something whent Wrong with code: %i", ((link *)vv)->name);
         }
         log_info("Assoc %s has been deleted!", t);
-        free(vv);
+        free(ii);
       }
     }
-    i = hm_remove(nodes_hm, filename);
-    if (i != 0) {
+    link * pp = hm_remove(nodes_hm, filename);
+    if (pp == NULL) {
       log_warn("Could not complete deletion of %s", filename);
       return -ENOENT;
     }
+    free(pp);
     log_info("Folder %s has been deleted!", filename);
+    log_debug("Amount of nodes: %i", hm_length(nodes_hm));
     return res;
 }
-static int empty_rename(const char *from, const char *to, unsigned int flags) {
-    log_debug( "Path from empty_rename: %s", from );
+static int empty_unlink(const char *path) {
+    // Delete a File
+    log_debug( "Path from empty_unlink: %s", path );
+
     return 0;
 }
-static int empty_link(const char *from, const char *to) {
-    log_debug( "Path from empty_link: %s", from );
+static int empty_rename(const char *from, const char *to, unsigned int flags) {
+    // Beim umbenenneen aka. mv filea fileb
+    log_debug( "Path from empty_rename: %s", from );
     return 0;
 }
 static int empty_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
@@ -378,22 +396,22 @@ static int empty_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_
     return 0;
 }
 static int empty_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
+    // update timestamp of a File eg. touch filea
     (void) fi;
     return 0;
 }
 static int empty_open(const char *path, struct fuse_file_info *fi) {
+    // get FH for a file, eg. cat filea
     log_debug( "Path from empty_open: %s", path );
     return 0;
 }
 static int empty_flush(const char *path, struct fuse_file_info *fi) {
+    // Flush the output pipe
     log_debug( "Path from empty_flush: %s", path );
     return 0;
 }
-static int empty_fsync(const char *path, int isdatasync, struct fuse_file_info *fi) {
-    log_debug( "Path from empty_fsync: %s", path );
-    return 0;
-}
 static int empty_release(const char *path, struct fuse_file_info *fi) {
+    // Release a FH
     log_debug( "Path from empty_release: %s", path );
     return 0;
 }
@@ -403,6 +421,30 @@ static int empty_read(const char *path, char *rbuf, size_t size, off_t offset, s
 }
 static int empty_write(const char *path, const char *wbuf, size_t size, off_t offset, struct fuse_file_info *fi) {
     log_debug( "Path from empty_write: %s", path );
+    return 0;
+}
+
+
+// Functions that CAN be implemented but dont have to. Will be last
+static int empty_mknod(const char *path, mode_t mode, dev_t rdev) {
+    // Create a normal File, will NOT be called if create is defined
+    log_debug( "Path from empty_mknod: %s", path );
+    return 0;
+}
+static int empty_readlink(const char *path, char *linkbuf, size_t size) {
+    log_debug( "Path from empty_readlink: %s", path );
+    return 0;
+}
+static int empty_symlink(const char *from, const char *to) {
+    log_debug( "Path from empty_symlink: %s", from );
+    return 0;
+}
+static int empty_link(const char *from, const char *to) {
+    log_debug( "Path from empty_link: %s", from );
+    return 0;
+}
+static int empty_fsync(const char *path, int isdatasync, struct fuse_file_info *fi) {
+    log_debug( "Path from empty_fsync: %s", path );
     return 0;
 }
 static int empty_statfs(const char *path, struct statvfs *buf) {

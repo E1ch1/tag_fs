@@ -13,16 +13,35 @@ link * get_last(link* current) {
   }
   return current;
 }
-
-link * get_previous(link *current, char* name) {
-  link *nn = current->next;
-  if (nn == NULL) {
-    return NULL;
-  }
-  if (strcmp(nn->name, name) != 0) {
-    return get_last((link*)current->next);
+link_int * get_last_int(link_int* current) {
+  if (current->next != NULL) {
+    return get_last_int((link_int*)current->next);
   }
   return current;
+}
+
+link * get_previous(link *current, char* name) {
+  link *nn = current;
+  while(nn->next != NULL) {
+    link *nnn = nn->next;
+    if (strcmp(nnn->name, name) == 0) {
+      return nn;
+    }
+    nn = nnn;
+  }
+  return NULL;
+}
+
+link_int * get_previous_int(link_int *current, unsigned long long name) {
+  link_int *nn = current->next;
+  while(nn->next != NULL) {
+    link_int *nnn = nn->next;
+    if (nnn->name == name) {
+      return nn;
+    }
+    nn = nnn;
+  }
+  return NULL;
 }
 
 void * hm_get(link *in, char *name) {
@@ -36,10 +55,10 @@ void * hm_get(link *in, char *name) {
 }
 
 
-int hm_remove(link *in, char* name) {
+link * hm_remove(link *in, char* name) {
   link *ll = get_previous(in, name);
   if (ll == NULL) {
-    return 1;
+    return NULL;
   }
   link *lll = ll->next;
   if (lll != NULL) {
@@ -49,10 +68,11 @@ int hm_remove(link *in, char* name) {
     } else {
       ll->next = NULL;
     }
-    free(lll);
+    return lll;
   }
-  return 0;
+  return NULL;
 }
+
 
 void hm_dump(link *in) {
   if (in->val != NULL) {
@@ -80,8 +100,8 @@ link * hm_set(link* in, char* name, void* item) {
   return l;
 }
 
-void * hm_get_int(link *in, int name) {
-  if ((int)(in->name) == name) {
+void * hm_get_int(link_int *in, unsigned long long name) {
+  if ((int)(((*in).name)) == name) {
     return in->val;
   }
   if (in->next != NULL) {
@@ -90,21 +110,48 @@ void * hm_get_int(link *in, int name) {
   return NULL;
 }
 
-link * hm_set_int(link* in, int name, void* item) {
-  link *tmp = hm_get_int(in, name);
+link_int * hm_set_int(link_int* in, unsigned long long name, void* item) {
+  link_int *tmp = hm_get_int(in, name);
   if (tmp != NULL) {
     tmp->val = item;
     return tmp;
   }
 
-  link *l = malloc(sizeof(link));
-  l->name = &name;
+  link_int *l = malloc(sizeof(link));
+  l->name = name;
   l->val = item;
-  link* last = (link*) get_last(in);
+  link_int* last = get_last_int(in);
   last->next = l;
   return l;
 }
 
+link_int * hm_remove_int(link_int *in, unsigned long long name) {
+  link_int *ll = get_previous_int(in, name);
+  if (ll == NULL) {
+    return NULL;
+  }
+  link_int *lll = ll->next;
+  if (lll != NULL) {
+    link_int *llll = lll->next;
+    if (llll != NULL) {
+      ll->next = llll;
+    } else {
+      ll->next = NULL;
+    }
+    return lll;
+  }
+  return NULL;
+}
+
+int hm_length(link* in) {
+  int ret = 1;
+  link* temp = in;
+  while(temp->next != NULL) {
+    temp = temp->next;
+    ret++;
+  }
+  return ret;
+}
 
 /*
 int main() {
