@@ -108,10 +108,6 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
     }
 	return res;
 }
-static int empty_access(const char *path, int mask) {    
-    log_debug( "Path from empty_access: %s", path );
-    return 0;
-}
 static int empty_opendir(const char *path, struct fuse_file_info *fi) { 
     int res = 0;
 
@@ -376,10 +372,42 @@ static int empty_rmdir(const char *path_in) {
     log_debug("Amount of nodes: %i", hm_length(nodes_hm));
     return res;
 }
-static int empty_unlink(const char *path) {
+static int empty_unlink(const char *path_in) {
     // Delete a File
-    log_debug( "Path from empty_unlink: %s", path );
+    log_debug( "Path from empty_unlink: %s", path_in );
+    int res = 0;
+	
+		if (strcmp(path_in, "/") == 0) {
+			return 1;
+		}
+    int ret = 0;
+    path_in++;
+    char * path = strdup(path_in);
+    char * array[MAX_FILE_AMOUNT];
+    int i = 0;
 
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
+    }
+    char * filename = array[kk-1];
+		printf("Filename is: %s\n", filename);
+
+    link * pp = hm_remove(nodes_hm, filename);
+    if (pp == NULL) {
+      log_warn("Could not complete deletion of %s", filename);
+      return -ENOENT;
+    }
+
+    return 0;
+}
+static int empty_access(const char *path, int mask) { 
+    log_debug( "Path from empty_access: %s", path );
     return 0;
 }
 static int empty_rename(const char *from, const char *to, unsigned int flags) {
@@ -466,7 +494,7 @@ static struct fuse_operations hello_oper = {
 		.mknod      = empty_mknod,
 		.mkdir      = empty_mkdir,
 		.symlink    = empty_symlink, 
-		//.unlink     = empty_unlink, 
+		.unlink     = empty_unlink, 
 		.rmdir      = empty_rmdir, 
 		.rename     = empty_rename, 
 		.link       = empty_link, 
