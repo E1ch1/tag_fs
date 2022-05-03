@@ -54,6 +54,17 @@ void * hm_get(link *in, char *name) {
   return NULL;
 }
 
+link * hm_get_link(link *in, char *name) {
+  link * temp = in;
+
+  while(temp != NULL) {
+    if (strcmp(temp->name, name) == 0) {
+      return temp;
+    }
+    temp = temp->next;
+  }
+  return NULL;
+}
 
 link * hm_remove(link *in, char* name) {
   link *ll = get_previous(in, name);
@@ -75,15 +86,14 @@ link * hm_remove(link *in, char* name) {
 
 
 void hm_dump(link *in) {
-  if (in->val != NULL) {
-    printf("%s\n", (char*)in->val);
-  } else {
-    printf("%s: NO_NAME\n", in->name);
-  }
-  if (in->next != NULL) {
-    return hm_dump(in->next);
+
+  link * temp = in;
+  while(temp != NULL) {
+    printf("Name of Link: %s\n", temp->name);
+    temp = temp->next;
   }
 }
+
 
 link * hm_set(link* in, char* name, void* item) {
   link *tmp = hm_get(in, name);
@@ -152,6 +162,7 @@ int hm_length(link* in) {
   }
   return ret;
 }
+
 
 /*
 int main() {

@@ -30,8 +30,8 @@ signed rand256() {
     return result % 256;
 }
 
-unsigned long long rand64bits() {
-    unsigned long long results = 0ULL;
+unsigned long rand64bits() {
+    unsigned long results = 0ULL;
     for ( int count = 8; count > 0; -- count ) {
         results = 256U * results + rand256();
     }
@@ -39,9 +39,9 @@ unsigned long long rand64bits() {
     return results;
 }
 
-unsigned long long getNextFH (char* name) {
+unsigned long getNextFH (char* name) {
   while(1) {
-    unsigned long long temp = rand64bits();
+    unsigned long temp = rand64bits();
     char* tt = hm_get_int(nodes_fd_hm, temp);
     if (tt == NULL) {
       link *l = hm_set_int(nodes_fd_hm, temp, name);
@@ -50,14 +50,106 @@ unsigned long long getNextFH (char* name) {
   }
 }
 
-static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
+int remove_specific_assoc(char * filename, char * pathname) {
+  if (strcmp(filename, pathname) == 0)
+    return 1;
+
+  char * t = malloc(sizeof(char)*strlen(pathname)+sizeof(char)*strlen(filename)+sizeof(char)+1);
+  sprintf(t, "%s-%s", pathname, filename);
+  node_assoc *vv = hm_get(assoc_hm, t);
+
+  if (vv != NULL) {
+    log_debug("Trying to delete %s", t);
+    link *ii = hm_remove(assoc_hm, t);
+    if (ii==NULL) {
+      log_warn("Something whent Wrong with code: %i", ((link *)vv)->name);
+      return 1;
+    }
+    log_info("Assoc %s has been deleted!", t);
+    free(ii);
+  }
+  return 0;
+}
+
+link * exist_specific_assoc(char * filename, char * pathname) {
+  link * ret = NULL;
+  if (strcmp(filename, pathname) == 0)
+    return NULL;
+  char * t = malloc(sizeof(char)*strlen(pathname)+sizeof(char)*strlen(filename)+sizeof(char)+1);
+  sprintf(t, "%s-%s", pathname, filename);
+  node_assoc *vv = hm_get(assoc_hm, t);
+  if (vv != NULL) {
+    return ret = vv;
+  }
+  return ret;
+}
+
+int remove_all_assoc(char * filename) {
+  int ret = 0;
+  char* t;
+  link* temp = nodes_hm;
+  while(temp->next != NULL) {
+
+    t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(filename)+sizeof(char)+1);
+    sprintf(t, "%s-%s", temp->name, filename);
+    node_assoc *vv = hm_get(assoc_hm, t);
+    if (vv != NULL) {
+      log_debug("Trying to delete %s", t);
+      link *ii = hm_remove(assoc_hm, t);
+      if (ii==NULL) {
+        log_warn("Something whent Wrong with code: %i", ((link *)vv)->name);
+      }
+      log_info("Assoc %s has been deleted!", t);
+      ret++;
+      free(ii);
+    }
+    temp = temp->next;
+  }
+  return ret;
+}
+
+int rename_all_assoc(char * filename, char * to) {
+  int ret = 0;
+  link* temp = nodes_hm;
+  while(temp != NULL) {
+    char * t = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(filename)+sizeof(char)+1);
+    sprintf(t, "%s-%s", temp->name, filename);
+    char * tt = malloc(sizeof(char)*strlen(temp->name)+sizeof(char)*strlen(to)+sizeof(char)+1);
+    sprintf(tt, "%s-%s", temp->name, to);
+    node_assoc *na = hm_get(assoc_hm, t);
+    if (na != NULL) {
+      link * la = hm_get_link(assoc_hm, t);
+      if (strcmp(na->nodename1, filename) == 0) {
+        na->nodename1 = strdup(to);
+        la->name = tt;
+      }
+      if (strcmp(na->nodename2, filename) == 0) {
+        na->nodename2 = strdup(to);
+        la->name = tt;
+      }
+    }
+    temp = temp->next;
+  }
+  return ret;
+}
+
+void hm_dump_link_nodeassoc(link *in) {
+  link * temp = in;
+  while(temp != NULL) {
+    node_assoc * as = temp->val;
+    printf("Name of Link: %s to %s\n", as->nodename2, as->nodename1);
+    temp = temp->next;
+  }
+}
+
+static int empty_getattr(const char *path_in, struct stat *stbuf, struct fuse_file_info *fi) {
     (void) fi;
     int res = 0;
-    log_debug( "Path from empty_getattr: %s", path );
+    log_debug( "Path from empty_getattr: %s", path_in );
 
 	
 		memset(stbuf, 0, sizeof(struct stat));
-		if (strcmp(path, "/") == 0) {
+		if (strcmp(path_in, "/") == 0) {
 			//node* n = get_node("/", nodes, MAX_FILE_AMOUNT);
       node* n = hm_get(nodes_hm, ASSOC_DEFAULT_ROOT);
       if (n == NULL) {
@@ -69,13 +161,14 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
 			stbuf->st_nlink = 2;
 			return 0;
 		}
-
-    char * path_new = strrchr(path, '/');
-    path = path_new ? path_new + 1 : path;
-
-    
-    //char string[] = "abc/qwe/jkh";
-    char *array[MAX_FILE_AMOUNT];
+	
+		if (strcmp(path_in, "/") == 0) {
+			return 1;
+		}
+    int ret = 0;
+    path_in++;
+    char * path = strdup(path_in);
+    char * array[MAX_FILE_AMOUNT];
     int i = 0;
 
     array[i] = strtok(path, "/");
@@ -88,6 +181,17 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
         if (array[kk] == NULL) break;
     }
     char * filename = array[kk-1];
+    array[kk-1] = NULL;
+
+    int ii = 0;
+    while(array[ii] != NULL) {
+      printf("Path from gettatr: %s\n", array[ii]);
+      link * pp = exist_specific_assoc(filename, array[ii]);
+      if (pp == NULL) {
+        return -ENOENT;
+      }
+      ii++;
+    }
     
     node *ter = hm_get(nodes_hm, filename);
     if (ter == NULL) {
@@ -396,25 +500,106 @@ static int empty_unlink(const char *path_in) {
         if (array[kk] == NULL) break;
     }
     char * filename = array[kk-1];
-		printf("Filename is: %s\n", filename);
-
-    link * pp = hm_remove(nodes_hm, filename);
-    if (pp == NULL) {
-      log_warn("Could not complete deletion of %s", filename);
-      return -ENOENT;
+    int ii = 0;
+    while(array[ii] != NULL) {
+      int k = remove_specific_assoc(filename, array[ii]);
+      ii++;
+    }
+    if (ii == 0) {
+      int k = remove_specific_assoc(filename, ASSOC_DEFAULT_ROOT);
+      link * ll = hm_remove(nodes_hm, filename);
+      if (ll == NULL) {
+        printf("Could not delete File: %s", filename);
+      }
     }
 
     return 0;
 }
+
 static int empty_access(const char *path, int mask) { 
     log_debug( "Path from empty_access: %s", path );
+    log_debug( "Mask from empty_access: %i", mask);
+    // Allow All because i have no idea rn
     return 0;
 }
 static int empty_rename(const char *from, const char *to, unsigned int flags) {
     // Beim umbenenneen aka. mv filea fileb
-    log_debug( "Path from empty_rename: %s", from );
+    log_debug( "Path from empty_rename from: %s", from );
+    log_debug( "Path from empty_rename to: %s", to );
+
+    int res = 0;
+    char * filename_from;
+    char * filename_to; 
+    char * array_from[MAX_FILE_AMOUNT];
+    char * array_to[MAX_FILE_AMOUNT];
+    char * path_from;
+    char * path_to;
+
+
+    // From PART =========================== 0
+
+
+    // From PART =========================== 1
+    //
+    // To PART   =========================== 0
+    // FILENAME PARTS ====================== 0
+    path_from = strdup(from);
+    int i = 0;
+    array_from[i] = strtok(path_from, "/");
+    while(array_from[i] != NULL)
+        array_from[++i] = strtok(NULL, "/");
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array_from[kk] == NULL) break;
+    }
+    filename_from = array_from[kk-1];
+    log_debug("Filename_from is: %s", filename_from);
+
+    path_to = strdup(to);
+    i = 0;
+    array_to[i] = strtok(path_to, "/");
+    while(array_to[i] != NULL)
+        array_to[++i] = strtok(NULL, "/");
+    kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array_to[kk] == NULL) break;
+    }
+    filename_to = array_to[kk-1];
+    log_debug("Filename_to is: %s", filename_to);
+    // FILENAME PARTS ====================== 1
+
+    // RENAME AND CONQUER
+    node * link_from = hm_get(nodes_hm, filename_from);
+    if (link_from == NULL) {
+      return -ENOENT;
+    }
+
+    node * link_to = hm_get(nodes_hm, filename_to);
+    if (link_to != NULL) {
+      // FIND AND CONQUER
+      remove_all_assoc(filename_to);
+      remove_specific_assoc(filename_to, ASSOC_DEFAULT_ROOT);
+      link * aa = hm_remove(nodes_hm, filename_to);
+      if (aa == NULL) {
+        log_error("Konnte den alten Link nicht entfernen!!");
+      }
+      log_debug("Komplette Säuberung von %s", filename_to);
+      free(link_to);
+    }
+
+    if (link_from != NULL) {
+      printf("%s\n", link_from->nodename);
+      printf("%s\n", filename_to);
+      rename_all_assoc(link_from->nodename, filename_to);
+      link * ll = hm_get_link(nodes_hm, link_from->nodename);
+      ll->name = strdup(filename_to);
+      link_from->nodename = strdup(filename_to);
+    }
+
     return 0;
 }
+
+
 static int empty_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
     log_debug( "Path from empty_chmod: %s", path );
     return 0;
@@ -538,9 +723,9 @@ void insert_basics() {
   nodes_hm = hm_new(ff, ASSOC_DEFAULT_ROOT);
 
   node_assoc *root_na = malloc(sizeof(node_assoc));
-  root_na->nodename1 = "";
-  root_na->nodename2 = "";
-  assoc_hm = hm_new(root_na, "");
+  root_na->nodename1 = ASSOC_DEFAULT_ROOT;
+  root_na->nodename2 = ASSOC_DEFAULT_ROOT;
+  assoc_hm = hm_new(root_na, "/-/");
   nodes_fd_hm = hm_new(ff, 0);
 }
 
@@ -554,7 +739,7 @@ void test_scene() {
   f->mode = S_IFREG | 0777;
   f->last_access = time(NULL);
   f->content = NULL;
-  hm_set(nodes_hm, f->nodename, f);
+  hm_set(nodes_hm, f->nodename, f);  
 
   node *ff = malloc(sizeof(node));
   ff->nodename = "Music"; 
@@ -566,27 +751,42 @@ void test_scene() {
   ff->content = NULL;
   hm_set(nodes_hm, ff->nodename, ff);
 
-  node_assoc *ff_na = malloc(sizeof(node_assoc));
-  ff_na->nodename1 = ff->nodename;
-  ff_na->nodename2 = ASSOC_DEFAULT_ROOT;
+  node *fff = malloc(sizeof(node));
+  fff->nodename = "nope.mp3";
+  fff->node_type = NODE_TYPE_FILE;
+  fff->uid = getuid();
+  fff->gid = getgid();
+  fff->mode = S_IFREG | 0777;
+  fff->last_access = time(NULL);
+  fff->content = NULL;
+  hm_set(nodes_hm, fff->nodename, fff);
 
-  char* tt = malloc(sizeof(char)*strlen(ff->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
-  sprintf(tt, "%s-%s", ASSOC_DEFAULT_ROOT, ff->nodename);
-  hm_set(assoc_hm, tt, ff_na);
 
   node_assoc *f_na = malloc(sizeof(node_assoc));
   f_na->nodename1 = f->nodename;
   f_na->nodename2 = ASSOC_DEFAULT_ROOT;
-
   char* t = malloc(sizeof(char)*strlen(f->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
   sprintf(t, "%s-%s", ASSOC_DEFAULT_ROOT, f->nodename);
   hm_set(assoc_hm, t, f_na);
 
-  node_assoc *fff_na = malloc(sizeof(node_assoc));
-  fff_na->nodename1 = f->nodename;
-  fff_na->nodename2 = ff->nodename;
+  node_assoc *ff_na = malloc(sizeof(node_assoc));
+  ff_na->nodename1 = ff->nodename;
+  ff_na->nodename2 = ASSOC_DEFAULT_ROOT;
+  char* tt = malloc(sizeof(char)*strlen(ff->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
+  sprintf(tt, "%s-%s", ASSOC_DEFAULT_ROOT, ff->nodename);
+  hm_set(assoc_hm, tt, ff_na);
 
-  char* ttt = malloc(sizeof(char)*strlen(f->nodename)+sizeof(char)*strlen(ff->nodename)+sizeof(char)+1);
-  sprintf(ttt, "%s-%s", ff->nodename, f->nodename);
+  node_assoc *fff_na = malloc(sizeof(node_assoc));
+  fff_na->nodename1 = fff->nodename;
+  fff_na->nodename2 = ASSOC_DEFAULT_ROOT;
+  char* ttt = malloc(sizeof(char)*strlen(fff->nodename)+sizeof(char)*strlen(ASSOC_DEFAULT_ROOT)+sizeof(char)+1);
+  sprintf(ttt, "%s-%s", ASSOC_DEFAULT_ROOT, fff->nodename);
   hm_set(assoc_hm, ttt, fff_na);
+
+  node_assoc *fftoff = malloc(sizeof(node_assoc));
+  fftoff->nodename1 = f->nodename;
+  fftoff->nodename2 = ff->nodename;
+  char* tttt = malloc(sizeof(char)*strlen(f->nodename)+sizeof(char)*strlen(ff->nodename)+sizeof(char)+1);
+  sprintf(tttt, "%s-%s", ff->nodename, f->nodename);
+  hm_set(assoc_hm, tttt, fftoff);
 }
