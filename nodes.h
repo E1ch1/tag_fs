@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "linked.h"
 #define NODE_TYPE_FILE 0
 #define NODE_TYPE_TAG 1
 #define ASSOC_DEFAULT_ROOT "/" 
@@ -14,31 +15,15 @@ typedef struct {
   const char * content;
 } node;
 
-int add_node(node in, node into[], int length);
-int remove_node(char *nodename, node into[], int length);
-int rename_node(char *nodename, char * new_name, node into[], int length);
-void print_nodes(node into[], int length);
-node* get_node(char *nodename, node into[], int length); 
-int get_node_fh(char *nodename, node into[], int length); 
-
 // So that a File or a Tag can be associated with another one more then one
 // n:m
 typedef struct {
-  const char * nodename1;
-  const char * nodename2;
+  const node * node1;
+  const node * node2;
 } node_assoc;
 
-int add_assoc(char* nodename1, char* nodename2, node_assoc into[], int length);
-
-int get_assocs(
-    char* node_name, 
-    node_assoc na[], int na_length,
-    node nodes[], int nodes_length,
-    node buffer[], int buffer_length);
-
-int remove_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length);
-int remove_assoc_single(const char* nodename1, node_assoc na[], int length);
-int is_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length);
-int add_default_assoc(char * nodename, node_assoc na[], int length);
-
-
+int remove_specific_assoc(link * assoc_hm, node * node1, node * node2);
+node_assoc * exist_specific_assoc(link * assoc_hm, node * node1, node * node2);
+int remove_all_assoc(link * assoc_hm, node * node1);
+int rename_all_assoc(link * assoc_hm, node * node1, char * to);
+void hm_dump_link_nodeassoc(link *in);

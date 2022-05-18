@@ -1,190 +1,100 @@
 #include "nodes.h"
 #include <string.h>
+#include "log.h"
 
-int add_node(node in, node into[], int length) {
-  printf("Name of the node: %s\n", in.nodename);
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename == NULL) {
-      into[p] = in;
-      return 0;
+int remove_specific_assoc(link * assoc_hm, node * node1, node * node2) {
+  if (node1 == node2)
+    return 1;
+
+  char * t = malloc(sizeof(char)*strlen(node1->nodename)+sizeof(char)*strlen(node2->nodename)+sizeof(char)+1);
+  sprintf(t, "%s-%s", node1->nodename, node2->nodename);
+  node_assoc *vv = hm_get(assoc_hm, t);
+
+  if (vv != NULL) {
+    log_debug("Trying to delete %s", t);
+    link *ii = hm_remove(assoc_hm, t);
+    if (ii==NULL) {
+      log_warn("Something whent Wrong with code: %i", ((link *)vv)->name);
+      return 1;
     }
+    log_info("Assoc %s has been deleted!", t);
+    free(ii);
   }
-  return 1;
+  return 0;
+}
+node_assoc * exist_specific_assoc(link * assoc_hm, node * node1, node * node2 ){
+  node_assoc * ret = NULL;
+  if (node1 == node2)
+    return NULL;
+
+  char * t = malloc(sizeof(char)*strlen(node2->nodename)+sizeof(char)*strlen(node1->nodename)+sizeof(char)+1);
+  sprintf(t, "%s-%s", node2->nodename, node1->nodename);
+  node_assoc *vv = hm_get(assoc_hm, t);
+  printf("Searching for this term: %s\n", t);
+
+  if (vv != NULL) {
+    return vv;
+  }
+
+  return ret;
 }
 
-int remove_node(char *nodename, node into[], int length) {
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename != NULL) {
-      if (strcmp(into[p].nodename, nodename) == 0) {
-        into[p] = (node){};
-        return 0;
+int remove_all_assoc(link * assoc_hm, node * node1) {
+
+  int ret = 0;
+  link * temp = assoc_hm;
+  while(temp != NULL) {
+
+    node_assoc *na = (node_assoc*)(temp->val);
+    if (na->node1 == node1 || na->node2 == node1) {
+      node *n1 = (node*)na->node1;
+      node *n2 = (node*)na->node2;
+      printf("Trying to remove: %s-%s\n", n1->nodename, n2->nodename);
+      int found = remove_specific_assoc(assoc_hm, n2, n1);
+      if (found == 0) {
+        free(na);
       }
+      ret++;
     }
+    if (temp->next == NULL) {
+      printf("The next is null%s\n", temp->name);
+    }
+    temp = temp->next;
   }
-  return 1;
+
+  return ret;
 }
 
-int rename_node(char *nodename, char * new_name, node into[], int length) {
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename != NULL) {
-      if (strcmp(into[p].nodename, nodename) == 0) {
-        into[p].nodename = new_name;
-        return 0;
-      }
-    }
-  }
-  return 1;
-}
-
-int search_node(char *nodename, node into[], int length) {
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename != NULL) {
-      if (strcmp(into[p].nodename, nodename) == 0) {
-        return 0;
-      }
-    }
-  }
-  return 1;
-}
-
-node *get_node(char *nodename, node into[], int length) {
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename != NULL) {
-      if (strcmp(into[p].nodename, nodename) == 0) {
-        return &into[p];
-      }
-    }
-  }
-  return &(node){0};
-}
-int get_node_fh(char *nodename, node into[], int length){
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename != NULL) {
-      if (strcmp(into[p].nodename, nodename) == 0) {
-        return p;
-      }
-    }
-  }
-  return NULL;
-}
-
-void print_nodes(node into[], int length) {
-  int p;
-  for (p = 0; p<length;p++) {
-    if (into[p].nodename != NULL) {
-      printf("current nodename %s\n", into[p].nodename);
-    }
-  }
-}
-
-int add_assoc(char* nodename1, char* nodename2, node_assoc into[], int length) {
-  int p;
-  for (p=0;p<length;p++) {
-    if (into[p].nodename1 == NULL && into[p].nodename2 == NULL) {
-      into[p] = (node_assoc){.nodename1 = nodename1, .nodename2 = nodename2};
-      return 0;
-    }
-  }
-  return 1;
-}
-
-// returns the buffer length
-// if 0 then theres no assocs found
-int get_assocs(
-    char* node_name, 
-    node_assoc na[], int na_length,
-    node nodes[], int nodes_length,
-    node buffer[], int buffer_length) {
-  node* ret = get_node(node_name, nodes, nodes_length);
-  if (ret == 0) {
+int rename_all_assoc(link * assoc_hm, node * node1, char * to) {
+  if (node1->nodename == to) 
     return 0;
-  }
-  int p;
-  int return_value = 0;
-  for (p=0;p<na_length;p++) {
-    if (na[p].nodename1 != NULL) {
-      if (strcmp(na[p].nodename2, ret->nodename) == 0) {
-        node* temp = get_node(na[p].nodename1, nodes, nodes_length);
-        if (temp != 0) {
-          add_node(*temp, buffer, buffer_length);
-          return_value++;
-        }
-      }
-    } else if (na[p].nodename2 != NULL) {
-      if (strcmp(na[p].nodename1, ret->nodename) == 0) {
-        node* temp = get_node(na[p].nodename2, nodes, nodes_length);
-        if (temp != 0) {
-          add_node(*temp, buffer, buffer_length);
-          return_value++;
-        }
-      }
-    }
-  }
-  return return_value;
-}
 
-// removes all occurences of this combination and returns amount removed
-int remove_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length) {
-  int p;
   int ret = 0;
-  for(p=0;p<length;p++) {
-    if (na[p].nodename1 == nodename1 && na[p].nodename2 == nodename2) {
-      na[p] = (node_assoc){};
-      ret++;
-    } else if (na[p].nodename1 == nodename2 && na[p].nodename1 == nodename2) {
-			na[p] = (node_assoc){};
-      ret++;
-		}
-  }
-  return ret;
-}
+  link * temp = assoc_hm;
+  while(temp != NULL) {
+    node_assoc *na = (node_assoc*)(temp->val);
+    if (na->node1 == node1 || na->node2 == node1) {
+      
+      char * t = malloc(sizeof(char)*strlen(node1->nodename)+sizeof(char)*strlen(to)+sizeof(char)+1);
+      sprintf(t, "%s-%s", node1->nodename, to);
+      free(temp->name);
+      temp->name = t;
 
-// removes all occurences where this nodename exists in either and returns amount removed
-int remove_assoc_single(const char * nodename1, node_assoc na[], int length) {
-  int p;
-  int ret = 0;
-  for(p=0;p<length;p++) {
-    if (na[p].nodename1 == nodename1 || na[p].nodename2 == nodename1) {
-      na[p] = (node_assoc){};
       ret++;
     }
+    temp = temp->next;
   }
   return ret;
 }
 
-// removes all occurences where this nodename exists in either and returns amount renamed
-int rename_assoc_single(const char * nodename1, const char * new_name, node_assoc na[], int length) {
-  int p;
-  int ret = 0;
-  for(p=0;p<length;p++) {
-    if (na[p].nodename1 == nodename1) {
-      na[p].nodename1 = new_name;
-      ret++;
-    } else if (na[p].nodename2 == nodename1) {
-      na[p].nodename2 = new_name;
-      ret++;
-		}
+void hm_dump_link_nodeassoc(link *in) {
+  link * temp = in;
+  while(temp != NULL) {
+    node_assoc * as = temp->val;
+    node * n1 = (node*)as->node1;
+    node * n2 = (node*)as->node2;
+    if (n1 != NULL && n2 != NULL)
+      printf("Name of Link: %s to %s\n", n1->nodename, n2->nodename);
+    temp = temp->next;
   }
-  return ret;
-}
-
-int add_default_assoc(char * nodename, node_assoc na[], int length) {
-	return add_assoc(nodename, ASSOC_DEFAULT_ROOT, na, length);
-}
-
-int is_assoc(const char * nodename1, const char * nodename2, node_assoc na[], int length) {
-  int p;
-  int ret = 0;
-  for(p=0;p<length;p++) {
-    if (na[p].nodename1 == nodename1 && na[p].nodename2 == nodename2) {
-      ret++;
-    }
-  }
-  return ret;
 }
