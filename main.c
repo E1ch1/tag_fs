@@ -438,8 +438,6 @@ static int empty_chmod(const char *path_in, mode_t mode, struct fuse_file_info *
         if (array[kk] == NULL) break;
     }
     char * filename = array[kk-1];
-		printf("hier!: %i\n", mode);
-		printf("Hier!!: %s\n", filename);
 
     node *n = hm_get(nodes_hm, filename);
     if (n == NULL) {
@@ -448,8 +446,40 @@ static int empty_chmod(const char *path_in, mode_t mode, struct fuse_file_info *
 		n->mode = mode;
     return 0;
 }
-static int empty_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
-    log_debug( "Path from empty_chown: %s", path );
+static int empty_chown(const char *path_in, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
+		int res = 0;
+	
+		if (strcmp(path_in, "/") == 0) {
+			return 1;
+		}
+    int ret = 0;
+    path_in++;
+    char * path = strdup(path_in);
+    char * array[MAX_FILE_AMOUNT];
+    int i = 0;
+
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
+    }
+    char * filename = array[kk-1];
+
+    node *n = hm_get(nodes_hm, filename);
+    if (n == NULL) {
+      return -ENOENT;
+    }
+
+		if (uid != -1) {
+			n->uid = uid;
+		}
+		if (gid != -1) {
+			n->gid = gid;
+		}
     return 0;
 }
 static int empty_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
