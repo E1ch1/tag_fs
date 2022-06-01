@@ -108,21 +108,38 @@ static int empty_getattr(const char *path, struct stat *stbuf, struct fuse_file_
     }
 	return res;
 }
-static int empty_opendir(const char *path, struct fuse_file_info *fi) { 
-    int res = 0;
+static int empty_opendir(const char *path_in, struct fuse_file_info *fi) { 
+		int res = 0;
+	
+		if (strcmp(path_in, "/") == 0) {
+    	fi->fh = (unsigned long) getNextFH(ASSOC_DEFAULT_ROOT);
+			log_debug("Opened Directory %s with Filehandle %i", ASSOC_DEFAULT_ROOT, fi->fh);
+			return 0;
+		}
+    int ret = 0;
+    path_in++;
+    char * path = strdup(path_in);
+    char * array[MAX_FILE_AMOUNT];
+    int i = 0;
 
-    // Falls man das momentane Verzeichnis auslesen will
-    if (strcmp(path, "/") == 0) {
-      fi->fh = (unsigned long) getNextFH(ASSOC_DEFAULT_ROOT);
-      return res;
+    array[i] = strtok(path, "/");
+
+    while(array[i] != NULL)
+        array[++i] = strtok(NULL, "/");
+    
+    int kk = 0;
+    for (kk = 0; kk < MAX_FILE_AMOUNT; kk++) {
+        if (array[kk] == NULL) break;
     }
+    char * filename = array[kk-1];
+		log_debug("Tried open dir %s", filename);
 
-    path++;
-    node* nn = hm_get(nodes_hm, path);
+    node* nn = hm_get(nodes_hm, filename);
     if (nn == NULL) {
       return -ENOENT;
     }
-    fi->fh = (unsigned long) getNextFH(path);
+    fi->fh = (unsigned long) getNextFH(filename);
+		log_debug("Opened Directory %s with Filehandle %i", path, fi->fh);
     return res;
 }
 static int empty_readdir(const char *path, void *dbuf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
@@ -490,7 +507,23 @@ static int empty_utimens(const char *path, const struct timespec tv[2], struct f
 static int empty_open(const char *path, struct fuse_file_info *fi) {
     // get FH for a file, eg. cat filea
     log_debug( "Path from empty_open: %s", path );
-    return 0;
+		int res = 0;
+
+    // Falls man das momentane Verzeichnis auslesen will
+    if (strcmp(path, "/") == 0) {
+			(void)fi;
+			log_warn("Tried opening %s with _open!", ASSOC_DEFAULT_ROOT);
+      return res;
+    }
+
+    path++;
+    node* nn = hm_get(nodes_hm, path);
+    if (nn == NULL) {
+      return -ENOENT;
+    }
+    fi->fh = (unsigned long) getNextFH(path);
+		log_debug("Opened File %s with Filehandle %i", path, fi->fh);
+    return res;
 }
 static int empty_flush(const char *path, struct fuse_file_info *fi) {
     // Flush the output pipe
