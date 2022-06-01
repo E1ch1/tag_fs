@@ -41,7 +41,7 @@ unsigned long long rand64bits() {
 
 unsigned long long getNextFH (char* name) {
   while(1) {
-    unsigned long long temp = rand64bits();
+    unsigned long long temp = rand256();
     char* tt = hm_get_int(nodes_fd_hm, temp);
     if (tt == NULL) {
       link *l = hm_set_int(nodes_fd_hm, temp, name);
