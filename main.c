@@ -325,11 +325,9 @@ static int empty_create(const char *path_in, mode_t mode, struct fuse_file_info 
     return 0;
 }
 static int empty_releasedir(const char *path, struct fuse_file_info *fi) {
-    log_debug( "empty_releasedir: Path from empty_releasedir: %s", path );
-    log_debug( "empty_releasedir: FH: %u", fi->fh );
     hm_remove_int(nodes_fd_hm, fi->fh);
     log_debug( "empty_releasedir: Amount of open Filehandles: %i", hm_length(nodes_fd_hm) );
-
+    log_debug( "Released Filehandle %i", fi->fh );
     return 0;
 }
 static int empty_rmdir(const char *path_in) {
@@ -532,7 +530,9 @@ static int empty_flush(const char *path, struct fuse_file_info *fi) {
 }
 static int empty_release(const char *path, struct fuse_file_info *fi) {
     // Release a FH
-    log_debug( "Path from empty_release: %s", path );
+    hm_remove_int(nodes_fd_hm, fi->fh);
+    log_debug( "empty_release: Amount of open Filehandles: %i", hm_length(nodes_fd_hm) );
+    log_debug( "Released Filehandle %i", fi->fh );
     return 0;
 }
 static int empty_read(const char *path, char *rbuf, size_t size, off_t offset, struct fuse_file_info *fi) {
